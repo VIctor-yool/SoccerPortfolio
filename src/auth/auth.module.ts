@@ -22,7 +22,10 @@ import { TeamMember } from '../teams/entities/team-member.entity';
         const expiresIn = configService.get<string>('JWT_EXPIRES_IN') || '7d';
         
         if (!secret) {
-          throw new Error('JWT_SECRET is not defined. Please set JWT_SECRET in your .env file');
+          const errorMessage = isProduction
+            ? 'JWT_SECRET is required in production. Please set JWT_SECRET environment variable in your deployment platform (e.g., Render dashboard).'
+            : 'JWT_SECRET is not defined. Please set JWT_SECRET in your .env file';
+          throw new Error(errorMessage);
         }
 
         return {
