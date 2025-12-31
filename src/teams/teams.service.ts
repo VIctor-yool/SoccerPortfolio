@@ -3,9 +3,13 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 import { Team } from './entities/team.entity';
 import { TeamMember, TeamMemberRole, TeamMemberStatus } from './entities/team-member.entity';
 import { TeamInvite } from './entities/team-invite.entity';
@@ -26,6 +30,8 @@ export class TeamsService {
     private teamInviteRepository: Repository<TeamInvite>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @Inject('SUPABASE_CLIENT')
+    private supabase: SupabaseClient,
   ) {}
 
   async createTeam(userId: string, createTeamDto: CreateTeamDto) {
@@ -360,6 +366,94 @@ export class TeamsService {
     };
   }
 
+  async uploadTeamLogo(teamId: string, userId: string, file: Express.Multer.File) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    // 팀장 권한 확인
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Not a team member');
+    }
+
+    if (member.role !== TeamMemberRole.CAPTAIN) {
+      throw new ForbiddenException('Only team captain can upload team logo');
+    }
+
+    // 파일 확장자 검증
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Only JPEG, PNG, and WebP images are allowed',
+      );
+    }
+
+    // 파일 크기 검증 (5MB 제한)
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxSize) {
+      throw new BadRequestException('File size must be less than 5MB');
+    }
+
+    const team = await this.teamRepository.findOne({
+      where: { id: teamId },
+    });
+
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    // 기존 로고가 있으면 삭제
+    if (team.logo) {
+      try {
+        const oldUrl = new URL(team.logo);
+        const pathParts = oldUrl.pathname.split('/');
+        const fileName = pathParts[pathParts.length - 1];
+        const filePath = `teams/${teamId}/${fileName}`;
+
+        await this.supabase.storage
+          .from('team-logos')
+          .remove([filePath]);
+      } catch (error) {
+        // 기존 파일 삭제 실패는 무시 (이미 삭제되었을 수 있음)
+        console.warn('Failed to delete old team logo:', error);
+      }
+    }
+
+    // 새 파일명 생성
+    const fileExtension = file.originalname.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExtension}`;
+    const filePath = `teams/${teamId}/${fileName}`;
+
+    // Supabase Storage에 업로드
+    const { data, error } = await this.supabase.storage
+      .from('team-logos')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (error) {
+      throw new BadRequestException(`Failed to upload image: ${error.message}`);
+    }
+
+    // Public URL 생성
+    const { data: urlData } = this.supabase.storage
+      .from('team-logos')
+      .getPublicUrl(filePath);
+
+    // DB에 URL 저장
+    team.logo = urlData.publicUrl;
+    await this.teamRepository.save(team);
+
+    return {
+      logoUrl: urlData.publicUrl,
+    };
+  }
+
   private async checkTeamPermission(teamId: string, userId: string) {
     const member = await this.teamMemberRepository.findOne({
       where: { teamId, userId },
@@ -377,4 +471,3 @@ export class TeamsService {
     }
   }
 }
-

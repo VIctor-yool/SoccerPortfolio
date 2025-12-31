@@ -7,7 +7,10 @@ import {
   Body,
   Param,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { TeamsService } from './teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { AddMemberDto } from './dto/add-member.dto';
@@ -117,6 +120,16 @@ export class TeamsController {
   @Get(':teamId')
   async getTeam(@Param('teamId') teamId: string) {
     return this.teamsService.getTeam(teamId);
+  }
+
+  @Post(':teamId/logo')
+  @UseInterceptors(FileInterceptor('logo'))
+  async uploadTeamLogo(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: User,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.teamsService.uploadTeamLogo(teamId, user.id, file);
   }
 
   @Delete(':teamId')

@@ -306,8 +306,7 @@ export class UsersService {
     await this.userRepository.save(user);
 
     return {
-      success: true,
-      profileImage: urlData.publicUrl,
+      imageUrl: urlData.publicUrl,
     };
   }
 }
