@@ -56,6 +56,24 @@ export class TeamsService {
     });
   }
 
+  async getUserTeam(userId: string) {
+    const member = await this.teamMemberRepository.findOne({
+      where: { userId },
+      relations: ['team'],
+    });
+
+    if (!member) {
+      return null;
+    }
+
+    return {
+      teamId: member.teamId,
+      teamName: member.team.name,
+      role: member.role,
+      status: member.status,
+    };
+  }
+
   async joinTeam(teamId: string, userId: string) {
     const team = await this.teamRepository.findOne({ where: { id: teamId } });
     if (!team) {

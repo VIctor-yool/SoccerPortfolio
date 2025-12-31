@@ -34,6 +34,11 @@ export class TeamsController {
     return this.teamsService.getPublicTeams();
   }
 
+  @Get('my-team')
+  async getMyTeam(@CurrentUser() user: User) {
+    return this.teamsService.getUserTeam(user.id);
+  }
+
   @Post(':teamId/join')
   async joinTeam(
     @Param('teamId') teamId: string,
