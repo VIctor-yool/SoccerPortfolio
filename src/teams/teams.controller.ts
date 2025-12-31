@@ -114,6 +114,11 @@ export class TeamsController {
     return this.teamsService.getTeamStats(teamId);
   }
 
+  @Get(':teamId')
+  async getTeam(@Param('teamId') teamId: string) {
+    return this.teamsService.getTeam(teamId);
+  }
+
   @Delete(':teamId')
   async deleteTeam(
     @Param('teamId') teamId: string,

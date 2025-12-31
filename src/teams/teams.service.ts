@@ -87,6 +87,30 @@ export class TeamsService {
     });
   }
 
+  async getTeam(teamId: string) {
+    const team = await this.teamRepository.findOne({
+      where: { id: teamId },
+      relations: ['captain'],
+    });
+
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    return {
+      id: team.id,
+      name: team.name,
+      region: team.region,
+      description: team.description,
+      logo: team.logo,
+      captain: team.captain ? {
+        id: team.captain.id,
+        name: team.captain.name,
+      } : null,
+      createdAt: team.createdAt,
+    };
+  }
+
   async getUserTeam(userId: string) {
     const member = await this.teamMemberRepository.findOne({
       where: { userId },
