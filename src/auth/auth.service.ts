@@ -60,12 +60,16 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(signupDto.password, 10);
+    
+    // 기본 프로필 이미지 URL 가져오기
+    const defaultProfileImage = this.configService.get<string>('PROFILE_DEFAULT_IMAGE');
 
     const user = this.userRepository.create({
       email: signupDto.email,
       password: hashedPassword,
       name: signupDto.name,
       provider: Provider.EMAIL,
+      profileImage: defaultProfileImage || undefined,
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -96,12 +100,15 @@ export class AuthService {
         user = await this.userRepository.save(existingUser);
       } else {
         // 새 사용자 생성
+        // 기본 프로필 이미지 URL 가져오기
+        const defaultProfileImage = this.configService.get<string>('PROFILE_DEFAULT_IMAGE');
+        
         user = this.userRepository.create({
           email: socialLoginDto.email,
           name: socialLoginDto.name,
           provider: socialLoginDto.provider,
           providerId: socialLoginDto.providerId,
-          profileImage: socialLoginDto.profileImage,
+          profileImage: socialLoginDto.profileImage || defaultProfileImage || undefined,
         });
         user = await this.userRepository.save(user);
       }

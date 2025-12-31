@@ -28,6 +28,9 @@ JWT_EXPIRES_IN=7d
 # Supabase
 SUPABASE_URL=your_supabase_project_url
 SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Profile Default Image (회원가입 시 기본 프로필 이미지)
+PROFILE_DEFAULT_IMAGE=https://your-cdn-url.com/default-profile.png
 ```
 
 ## Render 배포 환경
@@ -45,6 +48,7 @@ JWT_SECRET=<강력한 랜덤 문자열 - 최소 32자>
 JWT_REFRESH_SECRET=<JWT_SECRET과 다른 강력한 랜덤 문자열>
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
+PROFILE_DEFAULT_IMAGE=https://your-cdn-url.com/default-profile.png
 ```
 
 ### JWT_SECRET 생성 방법
