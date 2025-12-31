@@ -49,6 +49,37 @@ export class TeamsService {
     return savedTeam;
   }
 
+  async deleteTeam(teamId: string, userId: string) {
+    const team = await this.teamRepository.findOne({
+      where: { id: teamId },
+      relations: ['members'],
+    });
+
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Not a team member');
+    }
+
+    if (member.role !== TeamMemberRole.CAPTAIN) {
+      throw new ForbiddenException('Only team captain can delete the team');
+    }
+
+    // 팀원 모두 삭제
+    await this.teamMemberRepository.remove(team.members || []);
+    
+    // 팀 삭제
+    await this.teamRepository.remove(team);
+    
+    return { success: true };
+  }
+
   async getPublicTeams() {
     return this.teamRepository.find({
       relations: ['captain'],
@@ -96,6 +127,23 @@ export class TeamsService {
     });
 
     return this.teamMemberRepository.save(member);
+  }
+
+  async leaveTeam(teamId: string, userId: string) {
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (!member) {
+      throw new NotFoundException('Team membership not found');
+    }
+
+    if (member.role === TeamMemberRole.CAPTAIN) {
+      throw new ForbiddenException('Team captain cannot leave the team. Please delete the team instead.');
+    }
+
+    await this.teamMemberRepository.remove(member);
+    return { success: true };
   }
 
   async getTeamMembers(teamId: string) {
