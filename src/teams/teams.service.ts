@@ -685,6 +685,34 @@ export class TeamsService {
     }));
   }
 
+  async cancelJoinRequest(requestId: string, userId: string) {
+    const joinRequest = await this.teamJoinRequestRepository.findOne({
+      where: { id: requestId },
+      relations: ['team'],
+    });
+
+    if (!joinRequest) {
+      throw new NotFoundException('가입 신청을 찾을 수 없습니다');
+    }
+
+    // 본인의 신청인지 확인
+    if (joinRequest.userId !== userId) {
+      throw new ForbiddenException('본인의 가입 신청만 취소할 수 있습니다');
+    }
+
+    // 이미 검토된 신청은 취소 불가
+    if (joinRequest.status !== JoinRequestStatus.PENDING) {
+      throw new BadRequestException('이미 검토된 가입 신청은 취소할 수 없습니다');
+    }
+
+    await this.teamJoinRequestRepository.remove(joinRequest);
+
+    return {
+      success: true,
+      message: '가입 신청이 취소되었습니다',
+    };
+  }
+
   private async checkTeamPermission(teamId: string, userId: string) {
     const member = await this.teamMemberRepository.findOne({
       where: { teamId, userId },

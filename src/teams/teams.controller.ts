@@ -166,6 +166,14 @@ export class TeamsController {
     return this.teamsService.getMyJoinRequests(user.id);
   }
 
+  @Delete('join-requests/:requestId')
+  async cancelJoinRequest(
+    @Param('requestId') requestId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.teamsService.cancelJoinRequest(requestId, user.id);
+  }
+
   @Post('cleanup-duplicates')
   async cleanupDuplicateMemberships(@CurrentUser() user: User) {
     return this.teamsService.cleanupDuplicateMemberships(user.id);
