@@ -67,7 +67,7 @@ export class TeamsService {
     });
 
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     const member = await this.teamMemberRepository.findOne({
@@ -75,11 +75,11 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (member.role !== TeamMemberRole.CAPTAIN) {
-      throw new ForbiddenException('Only team captain can delete the team');
+      throw new ForbiddenException('팀장만 팀을 삭제할 수 있습니다');
     }
 
     // 팀원 모두 삭제
@@ -105,7 +105,7 @@ export class TeamsService {
     });
 
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     return {
@@ -151,11 +151,11 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new NotFoundException('Team membership not found');
+      throw new NotFoundException('팀 멤버십을 찾을 수 없습니다');
     }
 
     if (member.role === TeamMemberRole.CAPTAIN) {
-      throw new ForbiddenException('Team captain cannot leave the team. Please delete the team instead.');
+      throw new ForbiddenException('팀장은 팀을 떠날 수 없습니다. 대신 팀을 삭제해주세요.');
     }
 
     await this.teamMemberRepository.remove(member);
@@ -191,7 +191,7 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new NotFoundException('Team member not found');
+      throw new NotFoundException('팀원을 찾을 수 없습니다');
     }
 
     return {
@@ -219,14 +219,14 @@ export class TeamsService {
 
     const team = await this.teamRepository.findOne({ where: { id: teamId } });
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     const targetUser = await this.userRepository.findOne({
       where: { id: addMemberDto.userId },
     });
     if (!targetUser) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('사용자를 찾을 수 없습니다');
     }
 
     // 이미 해당 팀의 멤버인지 확인
@@ -235,7 +235,7 @@ export class TeamsService {
     });
 
     if (existingMember) {
-      throw new ConflictException('User is already a team member');
+      throw new ConflictException('이미 팀원입니다');
     }
 
     // 다른 팀에 소속되어 있는지 확인
@@ -244,7 +244,7 @@ export class TeamsService {
     });
 
     if (otherTeamMember) {
-      throw new ConflictException('User is already a member of another team. Please remove them from the current team first.');
+      throw new ConflictException('이미 다른 팀의 멤버입니다. 먼저 현재 팀에서 제거해주세요.');
     }
 
     const member = this.teamMemberRepository.create({
@@ -271,7 +271,7 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new NotFoundException('Team member not found');
+      throw new NotFoundException('팀원을 찾을 수 없습니다');
     }
 
     // 부팀장으로 임명하려는 경우 최대 2명 제한 확인
@@ -310,11 +310,11 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new NotFoundException('Team member not found');
+      throw new NotFoundException('팀원을 찾을 수 없습니다');
     }
 
     if (member.role === TeamMemberRole.CAPTAIN) {
-      throw new ForbiddenException('Cannot delete team captain');
+      throw new ForbiddenException('팀장은 삭제할 수 없습니다');
     }
 
     await this.teamMemberRepository.remove(member);
@@ -348,7 +348,7 @@ export class TeamsService {
     });
 
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     const members = team.members || [];
@@ -384,7 +384,7 @@ export class TeamsService {
 
   async uploadTeamLogo(teamId: string, userId: string, file: Express.Multer.File) {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw new BadRequestException('파일이 업로드되지 않았습니다');
     }
 
     // 팀장 권한 확인
@@ -393,25 +393,25 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (member.role !== TeamMemberRole.CAPTAIN) {
-      throw new ForbiddenException('Only team captain can upload team logo');
+      throw new ForbiddenException('팀장만 팀 로고를 업로드할 수 있습니다');
     }
 
     // 파일 확장자 검증
     const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
     if (!allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Only JPEG, PNG, and WebP images are allowed',
+        'JPEG, PNG, WebP 이미지만 허용됩니다',
       );
     }
 
     // 파일 크기 검증 (5MB 제한)
     const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
-      throw new BadRequestException('File size must be less than 5MB');
+      throw new BadRequestException('파일 크기는 5MB 미만이어야 합니다');
     }
 
     const team = await this.teamRepository.findOne({
@@ -419,7 +419,7 @@ export class TeamsService {
     });
 
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     // 기존 로고가 있으면 삭제
@@ -453,7 +453,7 @@ export class TeamsService {
       });
 
     if (error) {
-      throw new BadRequestException(`Failed to upload image: ${error.message}`);
+      throw new BadRequestException(`이미지 업로드 실패: ${error.message}`);
     }
 
     // Public URL 생성
@@ -506,7 +506,7 @@ export class TeamsService {
   async createJoinRequest(teamId: string, userId: string, createJoinRequestDto: CreateJoinRequestDto) {
     const team = await this.teamRepository.findOne({ where: { id: teamId } });
     if (!team) {
-      throw new NotFoundException('Team not found');
+      throw new NotFoundException('팀을 찾을 수 없습니다');
     }
 
     // 이미 해당 팀의 멤버인지 확인
@@ -515,7 +515,7 @@ export class TeamsService {
     });
 
     if (existingMember) {
-      throw new ConflictException('User is already a team member');
+      throw new ConflictException('이미 팀원입니다');
     }
 
     // 다른 팀에 소속되어 있는지 확인
@@ -524,7 +524,7 @@ export class TeamsService {
     });
 
     if (otherTeamMember) {
-      throw new ConflictException('User is already a member of another team. Please leave the current team first.');
+      throw new ConflictException('이미 다른 팀의 멤버입니다. 먼저 현재 팀을 떠나주세요.');
     }
 
     // 다른 팀에 대기 중인 가입 신청이 있는지 확인
@@ -537,7 +537,7 @@ export class TeamsService {
     });
 
     if (pendingRequest) {
-      throw new ConflictException(`You already have a pending join request for team "${pendingRequest.team.name}". Please wait for a response or cancel the existing request.`);
+      throw new ConflictException(`이미 "${pendingRequest.team.name}" 팀에 가입 신청이 대기 중입니다. 응답을 기다리거나 기존 신청을 취소해주세요.`);
     }
 
     // 이미 해당 팀에 대기 중인 가입 신청이 있는지 확인 (중복 체크)
@@ -550,7 +550,7 @@ export class TeamsService {
     });
 
     if (existingRequest) {
-      throw new ConflictException('Join request is already pending');
+      throw new ConflictException('가입 신청이 이미 대기 중입니다');
     }
 
     // 가입 신청 생성
@@ -571,11 +571,11 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (member.role !== TeamMemberRole.CAPTAIN && member.role !== TeamMemberRole.VICE_CAPTAIN) {
-      throw new ForbiddenException('Only captain or vice captain can view join requests');
+      throw new ForbiddenException('팀장 또는 부팀장만 가입 신청을 볼 수 있습니다');
     }
 
     const requests = await this.teamJoinRequestRepository.find({
@@ -611,11 +611,11 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (member.role !== TeamMemberRole.CAPTAIN && member.role !== TeamMemberRole.VICE_CAPTAIN) {
-      throw new ForbiddenException('Only captain or vice captain can review join requests');
+      throw new ForbiddenException('팀장 또는 부팀장만 가입 신청을 검토할 수 있습니다');
     }
 
     const joinRequest = await this.teamJoinRequestRepository.findOne({
@@ -624,11 +624,11 @@ export class TeamsService {
     });
 
     if (!joinRequest) {
-      throw new NotFoundException('Join request not found');
+      throw new NotFoundException('가입 신청을 찾을 수 없습니다');
     }
 
     if (joinRequest.status !== JoinRequestStatus.PENDING) {
-      throw new BadRequestException('Join request has already been reviewed');
+      throw new BadRequestException('가입 신청이 이미 검토되었습니다');
     }
 
     // 승인인 경우
@@ -639,7 +639,7 @@ export class TeamsService {
       });
 
       if (otherTeamMember) {
-        throw new ConflictException('User is already a member of another team');
+        throw new ConflictException('이미 다른 팀의 멤버입니다');
       }
 
       // 팀원으로 추가
@@ -691,14 +691,14 @@ export class TeamsService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (
       member.role !== TeamMemberRole.CAPTAIN &&
       member.role !== TeamMemberRole.VICE_CAPTAIN
     ) {
-      throw new ForbiddenException('Only captain or vice captain can perform this action');
+      throw new ForbiddenException('팀장 또는 부팀장만 이 작업을 수행할 수 있습니다');
     }
   }
 }
