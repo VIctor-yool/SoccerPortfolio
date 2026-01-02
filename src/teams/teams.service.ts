@@ -173,6 +173,7 @@ export class TeamsService {
       id: member.id,
       userId: member.user.id,
       name: member.user.name,
+      profileImage: member.user.profileImage,
       jerseyNumber: member.jerseyNumber,
       role: member.role,
       status: member.status,
