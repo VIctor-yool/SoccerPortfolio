@@ -1,5 +1,7 @@
-import { IsNumber, IsEnum, IsUUID } from 'class-validator';
+import { IsNumber, IsEnum, IsArray, ValidateNested, IsOptional } from 'class-validator';
+import { Type } from 'class-transformer';
 import { GameResult } from '../entities/game.entity';
+import { PlayerRecordDto } from './record-match.dto';
 
 export class CreateGameDto {
   @IsNumber()
@@ -12,6 +14,13 @@ export class CreateGameDto {
   opponentScore: number;
 
   @IsEnum(GameResult)
-  result: GameResult;
+  @IsOptional()
+  result?: GameResult;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PlayerRecordDto)
+  @IsOptional()
+  playerRecords?: PlayerRecordDto[];
 }
 

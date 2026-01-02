@@ -42,11 +42,6 @@ export class RecordMatchDto {
   @Type(() => CreateGameDto)
   games: CreateGameDto[];
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => PlayerRecordDto)
-  playerRecords: PlayerRecordDto[];
-
   @IsString()
   @IsOptional()
   notes?: string;

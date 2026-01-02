@@ -98,7 +98,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     const games = match.games || [];
@@ -145,7 +145,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     await this.checkTeamPermission(match.teamId, userId);
@@ -178,7 +178,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     await this.checkTeamPermission(match.teamId, userId);
@@ -215,7 +215,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     await this.checkTeamPermission(match.teamId, userId);
@@ -234,12 +234,22 @@ export class MatchesService {
     let totalOpponentScore = 0;
 
     for (const gameDto of recordMatchDto.games) {
+      // result 자동 계산 (프론트엔드에서 보내지 않을 수 있음)
+      let result: GameResult;
+      if (gameDto.ourScore > gameDto.opponentScore) {
+        result = GameResult.WIN;
+      } else if (gameDto.ourScore < gameDto.opponentScore) {
+        result = GameResult.LOSS;
+      } else {
+        result = GameResult.DRAW;
+      }
+
       const game = this.gameRepository.create({
         matchId,
         gameNumber: gameDto.gameNumber,
         ourScore: gameDto.ourScore,
         opponentScore: gameDto.opponentScore,
-        result: gameDto.result,
+        result: gameDto.result || result, // 프론트엔드에서 보낸 값이 있으면 사용, 없으면 계산값 사용
       });
 
       const savedGame = await this.gameRepository.save(game);
@@ -247,24 +257,26 @@ export class MatchesService {
 
       totalOurScore += gameDto.ourScore;
       totalOpponentScore += gameDto.opponentScore;
-    }
 
-    // 경기 기록 생성
-    for (const playerRecord of recordMatchDto.playerRecords) {
-      // 각 게임별로 기록 생성
-      for (const game of games) {
-        const record = this.matchRecordRepository.create({
-          matchId,
-          gameId: game.id,
-          userId: playerRecord.userId,
-          played: playerRecord.played,
-          goals: playerRecord.goals || 0,
-          assists: playerRecord.assists || 0,
-          goalType: playerRecord.goalType,
-          goalTime: playerRecord.goalTime,
-        });
+      // 각 게임별 playerRecords 저장
+      if (gameDto.playerRecords && gameDto.playerRecords.length > 0) {
+        for (const playerRecord of gameDto.playerRecords) {
+          // played가 true인 경우에만 기록 저장
+          if (playerRecord.played) {
+            const record = this.matchRecordRepository.create({
+              matchId,
+              gameId: savedGame.id,
+              userId: playerRecord.userId,
+              played: playerRecord.played,
+              goals: playerRecord.goals || 0,
+              assists: playerRecord.assists || 0,
+              goalType: playerRecord.goalType,
+              goalTime: playerRecord.goalTime,
+            });
 
-        await this.matchRecordRepository.save(record);
+            await this.matchRecordRepository.save(record);
+          }
+        }
       }
     }
 
@@ -288,7 +300,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     return {
@@ -315,7 +327,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     // 팀 멤버인지 확인
@@ -324,7 +336,7 @@ export class MatchesService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     // 기존 참석 투표 확인
@@ -382,7 +394,7 @@ export class MatchesService {
     });
 
     if (!match) {
-      throw new NotFoundException('Match not found');
+      throw new NotFoundException('경기를 찾을 수 없습니다');
     }
 
     const attendances = await this.matchAttendanceRepository.find({
@@ -406,7 +418,7 @@ export class MatchesService {
     });
 
     if (!member) {
-      throw new ForbiddenException('Not a team member');
+      throw new ForbiddenException('팀원이 아닙니다');
     }
 
     if (
@@ -414,7 +426,7 @@ export class MatchesService {
       member.role !== TeamMemberRole.VICE_CAPTAIN
     ) {
       throw new ForbiddenException(
-        'Only captain or vice captain can perform this action',
+        '팀장 또는 부팀장만 이 작업을 수행할 수 있습니다',
       );
     }
   }
