@@ -15,6 +15,8 @@ import { TeamsService } from './teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
+import { CreateJoinRequestDto } from './dto/create-join-request.dto';
+import { ReviewJoinRequestDto } from './dto/review-join-request.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
@@ -46,8 +48,9 @@ export class TeamsController {
   async joinTeam(
     @Param('teamId') teamId: string,
     @CurrentUser() user: User,
+    @Body() createJoinRequestDto?: CreateJoinRequestDto,
   ) {
-    return this.teamsService.joinTeam(teamId, user.id);
+    return this.teamsService.joinTeam(teamId, user.id, createJoinRequestDto);
   }
 
   @Delete(':teamId/leave')
@@ -138,6 +141,34 @@ export class TeamsController {
     @CurrentUser() user: User,
   ) {
     return this.teamsService.deleteTeam(teamId, user.id);
+  }
+
+  @Get(':teamId/join-requests')
+  async getJoinRequests(
+    @Param('teamId') teamId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.teamsService.getJoinRequests(teamId, user.id);
+  }
+
+  @Put(':teamId/join-requests/:requestId')
+  async reviewJoinRequest(
+    @Param('teamId') teamId: string,
+    @Param('requestId') requestId: string,
+    @CurrentUser() user: User,
+    @Body() reviewJoinRequestDto: ReviewJoinRequestDto,
+  ) {
+    return this.teamsService.reviewJoinRequest(teamId, requestId, user.id, reviewJoinRequestDto);
+  }
+
+  @Get('join-requests/my')
+  async getMyJoinRequests(@CurrentUser() user: User) {
+    return this.teamsService.getMyJoinRequests(user.id);
+  }
+
+  @Post('cleanup-duplicates')
+  async cleanupDuplicateMemberships(@CurrentUser() user: User) {
+    return this.teamsService.cleanupDuplicateMemberships(user.id);
   }
 }
 

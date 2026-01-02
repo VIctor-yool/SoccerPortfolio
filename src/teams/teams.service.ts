@@ -13,10 +13,13 @@ import { v4 as uuidv4 } from 'uuid';
 import { Team } from './entities/team.entity';
 import { TeamMember, TeamMemberRole, TeamMemberStatus } from './entities/team-member.entity';
 import { TeamInvite } from './entities/team-invite.entity';
+import { TeamJoinRequest, JoinRequestStatus } from './entities/team-join-request.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { AddMemberDto } from './dto/add-member.dto';
 import { UpdateMemberDto } from './dto/update-member.dto';
+import { CreateJoinRequestDto } from './dto/create-join-request.dto';
+import { ReviewJoinRequestDto } from './dto/review-join-request.dto';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -28,6 +31,8 @@ export class TeamsService {
     private teamMemberRepository: Repository<TeamMember>,
     @InjectRepository(TeamInvite)
     private teamInviteRepository: Repository<TeamInvite>,
+    @InjectRepository(TeamJoinRequest)
+    private teamJoinRequestRepository: Repository<TeamJoinRequest>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
     @Inject('SUPABASE_CLIENT')
@@ -135,28 +140,9 @@ export class TeamsService {
     };
   }
 
-  async joinTeam(teamId: string, userId: string) {
-    const team = await this.teamRepository.findOne({ where: { id: teamId } });
-    if (!team) {
-      throw new NotFoundException('Team not found');
-    }
-
-    const existingMember = await this.teamMemberRepository.findOne({
-      where: { teamId, userId },
-    });
-
-    if (existingMember) {
-      throw new ConflictException('User is already a team member');
-    }
-
-    const member = this.teamMemberRepository.create({
-      teamId,
-      userId,
-      role: TeamMemberRole.MEMBER,
-      status: TeamMemberStatus.ACTIVE,
-    });
-
-    return this.teamMemberRepository.save(member);
+  async joinTeam(teamId: string, userId: string, createJoinRequestDto?: CreateJoinRequestDto) {
+    // joinTeam은 이제 가입 신청을 생성합니다
+    return this.createJoinRequest(teamId, userId, createJoinRequestDto || {});
   }
 
   async leaveTeam(teamId: string, userId: string) {
@@ -242,12 +228,22 @@ export class TeamsService {
       throw new NotFoundException('User not found');
     }
 
+    // 이미 해당 팀의 멤버인지 확인
     const existingMember = await this.teamMemberRepository.findOne({
       where: { teamId, userId: addMemberDto.userId },
     });
 
     if (existingMember) {
       throw new ConflictException('User is already a team member');
+    }
+
+    // 다른 팀에 소속되어 있는지 확인
+    const otherTeamMember = await this.teamMemberRepository.findOne({
+      where: { userId: addMemberDto.userId },
+    });
+
+    if (otherTeamMember) {
+      throw new ConflictException('User is already a member of another team. Please remove them from the current team first.');
     }
 
     const member = this.teamMemberRepository.create({
@@ -452,6 +448,208 @@ export class TeamsService {
     return {
       logoUrl: urlData.publicUrl,
     };
+  }
+
+  async cleanupDuplicateMemberships(userId: string) {
+    const memberships = await this.teamMemberRepository.find({
+      where: { userId },
+      relations: ['team'],
+      order: { joinedAt: 'DESC' },
+    });
+
+    if (memberships.length <= 1) {
+      return { message: 'No duplicate memberships found', kept: memberships[0]?.id || null };
+    }
+
+    // 팀장인 팀이 있으면 그 팀을 유지, 없으면 가장 최근에 가입한 팀 유지
+    const captainMembership = memberships.find(m => m.role === TeamMemberRole.CAPTAIN);
+    const membershipToKeep = captainMembership || memberships[0];
+    const membershipsToRemove = memberships.filter(m => m.id !== membershipToKeep.id);
+
+    // 중복 멤버십 삭제
+    await this.teamMemberRepository.remove(membershipsToRemove);
+
+    return {
+      message: `Cleaned up ${membershipsToRemove.length} duplicate membership(s)`,
+      kept: {
+        teamId: membershipToKeep.teamId,
+        teamName: membershipToKeep.team?.name,
+        role: membershipToKeep.role,
+      },
+      removed: membershipsToRemove.map(m => ({
+        teamId: m.teamId,
+        teamName: m.team?.name,
+      })),
+    };
+  }
+
+  async createJoinRequest(teamId: string, userId: string, createJoinRequestDto: CreateJoinRequestDto) {
+    const team = await this.teamRepository.findOne({ where: { id: teamId } });
+    if (!team) {
+      throw new NotFoundException('Team not found');
+    }
+
+    // 이미 해당 팀의 멤버인지 확인
+    const existingMember = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (existingMember) {
+      throw new ConflictException('User is already a team member');
+    }
+
+    // 다른 팀에 소속되어 있는지 확인
+    const otherTeamMember = await this.teamMemberRepository.findOne({
+      where: { userId },
+    });
+
+    if (otherTeamMember) {
+      throw new ConflictException('User is already a member of another team. Please leave the current team first.');
+    }
+
+    // 이미 대기 중인 가입 신청이 있는지 확인
+    const existingRequest = await this.teamJoinRequestRepository.findOne({
+      where: {
+        teamId,
+        userId,
+        status: JoinRequestStatus.PENDING,
+      },
+    });
+
+    if (existingRequest) {
+      throw new ConflictException('Join request is already pending');
+    }
+
+    // 가입 신청 생성
+    const joinRequest = this.teamJoinRequestRepository.create({
+      teamId,
+      userId,
+      message: createJoinRequestDto?.message,
+      status: JoinRequestStatus.PENDING,
+    });
+
+    return this.teamJoinRequestRepository.save(joinRequest);
+  }
+
+  async getJoinRequests(teamId: string, userId: string) {
+    // 팀장 권한 확인
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Not a team member');
+    }
+
+    if (member.role !== TeamMemberRole.CAPTAIN && member.role !== TeamMemberRole.VICE_CAPTAIN) {
+      throw new ForbiddenException('Only captain or vice captain can view join requests');
+    }
+
+    const requests = await this.teamJoinRequestRepository.find({
+      where: { teamId },
+      relations: ['user', 'user.positions'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return requests.map((request) => ({
+      id: request.id,
+      userId: request.user.id,
+      userName: request.user.name,
+      message: request.message,
+      status: request.status,
+      positions: request.user.positions?.map((p) => p.position) || [],
+      phone: request.user.phone,
+      birthdate: request.user.birthdate,
+      summary: request.user.summary,
+      createdAt: request.createdAt,
+      reviewedAt: request.reviewedAt,
+    }));
+  }
+
+  async reviewJoinRequest(
+    teamId: string,
+    requestId: string,
+    userId: string,
+    reviewJoinRequestDto: ReviewJoinRequestDto,
+  ) {
+    // 팀장 권한 확인
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId, userId },
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Not a team member');
+    }
+
+    if (member.role !== TeamMemberRole.CAPTAIN && member.role !== TeamMemberRole.VICE_CAPTAIN) {
+      throw new ForbiddenException('Only captain or vice captain can review join requests');
+    }
+
+    const joinRequest = await this.teamJoinRequestRepository.findOne({
+      where: { id: requestId, teamId },
+      relations: ['user'],
+    });
+
+    if (!joinRequest) {
+      throw new NotFoundException('Join request not found');
+    }
+
+    if (joinRequest.status !== JoinRequestStatus.PENDING) {
+      throw new BadRequestException('Join request has already been reviewed');
+    }
+
+    // 승인인 경우
+    if (reviewJoinRequestDto.status === JoinRequestStatus.APPROVED) {
+      // 이미 다른 팀에 소속되어 있는지 확인
+      const otherTeamMember = await this.teamMemberRepository.findOne({
+        where: { userId: joinRequest.userId },
+      });
+
+      if (otherTeamMember) {
+        throw new ConflictException('User is already a member of another team');
+      }
+
+      // 팀원으로 추가
+      const newMember = this.teamMemberRepository.create({
+        teamId,
+        userId: joinRequest.userId,
+        role: TeamMemberRole.MEMBER,
+        status: TeamMemberStatus.ACTIVE,
+      });
+
+      await this.teamMemberRepository.save(newMember);
+    }
+
+    // 신청 상태 업데이트
+    joinRequest.status = reviewJoinRequestDto.status;
+    joinRequest.reviewedBy = userId;
+    joinRequest.reviewedAt = new Date();
+
+    await this.teamJoinRequestRepository.save(joinRequest);
+
+    return {
+      id: joinRequest.id,
+      status: joinRequest.status,
+      reviewedAt: joinRequest.reviewedAt,
+    };
+  }
+
+  async getMyJoinRequests(userId: string) {
+    const requests = await this.teamJoinRequestRepository.find({
+      where: { userId },
+      relations: ['team', 'team.captain'],
+      order: { createdAt: 'DESC' },
+    });
+
+    return requests.map((request) => ({
+      id: request.id,
+      teamId: request.team.id,
+      teamName: request.team.name,
+      message: request.message,
+      status: request.status,
+      createdAt: request.createdAt,
+      reviewedAt: request.reviewedAt,
+    }));
   }
 
   private async checkTeamPermission(teamId: string, userId: string) {

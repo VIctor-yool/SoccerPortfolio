@@ -6,12 +6,13 @@ import { TeamsService } from './teams.service';
 import { Team } from './entities/team.entity';
 import { TeamMember } from './entities/team-member.entity';
 import { TeamInvite } from './entities/team-invite.entity';
+import { TeamJoinRequest } from './entities/team-join-request.entity';
 import { User } from '../users/entities/user.entity';
 import { createSupabaseClient } from '../common/config/supabase.config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Team, TeamMember, TeamInvite, User]),
+    TypeOrmModule.forFeature([Team, TeamMember, TeamInvite, TeamJoinRequest, User]),
     ConfigModule,
   ],
   controllers: [TeamsController],

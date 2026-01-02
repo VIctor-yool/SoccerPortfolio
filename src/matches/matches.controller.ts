@@ -13,6 +13,7 @@ import { MatchesService } from './matches.service';
 import { CreateMatchDto } from './dto/create-match.dto';
 import { UpdateMatchDto } from './dto/update-match.dto';
 import { RecordMatchDto } from './dto/record-match.dto';
+import { AttendanceVoteDto } from './dto/attendance-vote.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
@@ -79,6 +80,24 @@ export class MatchesController {
   @Get(':id/record')
   async getMatchRecord(@Param('id') id: string) {
     return this.matchesService.getMatchRecord(id);
+  }
+
+  @Post(':id/attendance')
+  async voteAttendance(
+    @Param('id') matchId: string,
+    @CurrentUser() user: User,
+    @Body() attendanceVoteDto: AttendanceVoteDto,
+  ) {
+    return this.matchesService.voteAttendance(
+      matchId,
+      user.id,
+      attendanceVoteDto,
+    );
+  }
+
+  @Get(':id/attendance')
+  async getAttendances(@Param('id') matchId: string) {
+    return this.matchesService.getAttendances(matchId);
   }
 }
 

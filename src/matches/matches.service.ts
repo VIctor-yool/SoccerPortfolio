@@ -14,6 +14,7 @@ import { TeamMember, TeamMemberRole } from '../teams/entities/team-member.entity
 import { CreateMatchDto } from './dto/create-match.dto';
 import { UpdateMatchDto } from './dto/update-match.dto';
 import { RecordMatchDto, PlayerRecordDto } from './dto/record-match.dto';
+import { AttendanceVoteDto } from './dto/attendance-vote.dto';
 
 @Injectable()
 export class MatchesService {
@@ -93,7 +94,7 @@ export class MatchesService {
   async getMatch(id: string) {
     const match = await this.matchRepository.findOne({
       where: { id },
-      relations: ['games', 'games.records', 'games.records.user'],
+      relations: ['games', 'games.records', 'games.records.user', 'attendances', 'attendances.user'],
     });
 
     if (!match) {
@@ -125,6 +126,13 @@ export class MatchesService {
         opponentScore: game.opponentScore,
         result: game.result,
         records: game.records || [],
+      })),
+      attendances: (match.attendances || []).map((attendance) => ({
+        id: attendance.id,
+        userId: attendance.userId,
+        userName: attendance.user?.name || '',
+        status: attendance.status,
+        votedAt: attendance.votedAt,
       })),
       createdAt: match.createdAt,
       updatedAt: match.updatedAt,
@@ -295,6 +303,101 @@ export class MatchesService {
       })) || [],
       notes: match.notes,
     };
+  }
+
+  async voteAttendance(
+    matchId: string,
+    userId: string,
+    attendanceVoteDto: AttendanceVoteDto,
+  ) {
+    const match = await this.matchRepository.findOne({
+      where: { id: matchId },
+    });
+
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    // 팀 멤버인지 확인
+    const member = await this.teamMemberRepository.findOne({
+      where: { teamId: match.teamId, userId },
+    });
+
+    if (!member) {
+      throw new ForbiddenException('Not a team member');
+    }
+
+    // 기존 참석 투표 확인
+    const existingAttendance = await this.matchAttendanceRepository.findOne({
+      where: { matchId, userId },
+      relations: ['user'],
+    });
+
+    if (existingAttendance) {
+      // 기존 투표가 있으면 업데이트
+      existingAttendance.status = attendanceVoteDto.status;
+      const updated = await this.matchAttendanceRepository.save(
+        existingAttendance,
+      );
+      // user 정보 다시 로드
+      const updatedWithUser = await this.matchAttendanceRepository.findOne({
+        where: { id: updated.id },
+        relations: ['user'],
+      });
+      return {
+        id: updated.id,
+        matchId: updated.matchId,
+        userId: updated.userId,
+        userName: updatedWithUser?.user?.name || '',
+        status: updated.status,
+        votedAt: updated.votedAt,
+      };
+    } else {
+      // 새 투표 생성
+      const attendance = this.matchAttendanceRepository.create({
+        matchId,
+        userId,
+        status: attendanceVoteDto.status,
+      });
+      const saved = await this.matchAttendanceRepository.save(attendance);
+      // user 정보 로드
+      const savedWithUser = await this.matchAttendanceRepository.findOne({
+        where: { id: saved.id },
+        relations: ['user'],
+      });
+      return {
+        id: saved.id,
+        matchId: saved.matchId,
+        userId: saved.userId,
+        userName: savedWithUser?.user?.name || '',
+        status: saved.status,
+        votedAt: saved.votedAt,
+      };
+    }
+  }
+
+  async getAttendances(matchId: string) {
+    const match = await this.matchRepository.findOne({
+      where: { id: matchId },
+    });
+
+    if (!match) {
+      throw new NotFoundException('Match not found');
+    }
+
+    const attendances = await this.matchAttendanceRepository.find({
+      where: { matchId },
+      relations: ['user'],
+      order: { votedAt: 'ASC' },
+    });
+
+    return attendances.map((attendance) => ({
+      id: attendance.id,
+      userId: attendance.userId,
+      userName: attendance.user?.name || '',
+      status: attendance.status,
+      votedAt: attendance.votedAt,
+    }));
   }
 
   private async checkTeamPermission(teamId: string, userId: string) {
