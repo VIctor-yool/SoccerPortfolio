@@ -370,10 +370,14 @@ export class TeamsService {
 
     const averageAge = ageCount > 0 ? totalAge / ageCount : 0;
 
+    // 평균 참석률 계산 (현재는 0으로 설정, 추후 경기 데이터 기반으로 계산 가능)
+    const averageAttendance = 0;
+
     return {
       totalMembers: members.length,
       activeMembers: activeMembers.length,
       averageAge: Math.round(averageAge * 10) / 10,
+      averageAttendance: averageAttendance,
     };
   }
 
