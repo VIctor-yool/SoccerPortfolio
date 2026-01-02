@@ -7,7 +7,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Not } from 'typeorm';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { v4 as uuidv4 } from 'uuid';
 import { Team } from './entities/team.entity';
@@ -247,6 +247,22 @@ export class TeamsService {
       throw new ConflictException('이미 다른 팀의 멤버입니다. 먼저 현재 팀에서 제거해주세요.');
     }
 
+    // 등번호 중복 체크
+    if (addMemberDto.jerseyNumber !== undefined && addMemberDto.jerseyNumber !== null) {
+      const duplicateMember = await this.teamMemberRepository.findOne({
+        where: {
+          teamId,
+          jerseyNumber: addMemberDto.jerseyNumber,
+        },
+      });
+
+      if (duplicateMember) {
+        throw new ConflictException(
+          `등번호 ${addMemberDto.jerseyNumber}는 이미 사용 중입니다.`,
+        );
+      }
+    }
+
     const member = this.teamMemberRepository.create({
       teamId,
       userId: addMemberDto.userId,
@@ -290,6 +306,22 @@ export class TeamsService {
     }
 
     if (updateMemberDto.jerseyNumber !== undefined) {
+      // 등번호를 null로 설정하는 경우는 허용 (등번호 제거)
+      if (updateMemberDto.jerseyNumber !== null) {
+        const duplicateMember = await this.teamMemberRepository.findOne({
+          where: {
+            teamId,
+            jerseyNumber: updateMemberDto.jerseyNumber,
+            id: Not(memberId), // 현재 멤버 제외
+          },
+        });
+
+        if (duplicateMember) {
+          throw new ConflictException(
+            `등번호 ${updateMemberDto.jerseyNumber}는 이미 사용 중입니다.`,
+          );
+        }
+      }
       member.jerseyNumber = updateMemberDto.jerseyNumber;
     }
     if (updateMemberDto.role !== undefined) {
