@@ -527,7 +527,20 @@ export class TeamsService {
       throw new ConflictException('User is already a member of another team. Please leave the current team first.');
     }
 
-    // 이미 대기 중인 가입 신청이 있는지 확인
+    // 다른 팀에 대기 중인 가입 신청이 있는지 확인
+    const pendingRequest = await this.teamJoinRequestRepository.findOne({
+      where: {
+        userId,
+        status: JoinRequestStatus.PENDING,
+      },
+      relations: ['team'],
+    });
+
+    if (pendingRequest) {
+      throw new ConflictException(`You already have a pending join request for team "${pendingRequest.team.name}". Please wait for a response or cancel the existing request.`);
+    }
+
+    // 이미 해당 팀에 대기 중인 가입 신청이 있는지 확인 (중복 체크)
     const existingRequest = await this.teamJoinRequestRepository.findOne({
       where: {
         teamId,
