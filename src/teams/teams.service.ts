@@ -273,6 +273,21 @@ export class TeamsService {
       throw new NotFoundException('Team member not found');
     }
 
+    // 부팀장으로 임명하려는 경우 최대 2명 제한 확인
+    if (updateMemberDto.role === TeamMemberRole.VICE_CAPTAIN) {
+      const currentViceCaptains = await this.teamMemberRepository.find({
+        where: {
+          teamId,
+          role: TeamMemberRole.VICE_CAPTAIN,
+        },
+      });
+
+      // 현재 부팀장이 2명이고, 변경하려는 멤버가 이미 부팀장이 아닌 경우
+      if (currentViceCaptains.length >= 2 && member.role !== TeamMemberRole.VICE_CAPTAIN) {
+        throw new BadRequestException('부팀장은 최대 2명까지 임명할 수 있습니다.');
+      }
+    }
+
     if (updateMemberDto.jerseyNumber !== undefined) {
       member.jerseyNumber = updateMemberDto.jerseyNumber;
     }
